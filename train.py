@@ -7,6 +7,13 @@ import sys
 
 import random
 
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--debug', metavar='fn', default="", help="Dump outputs into file")
+parser.add_argument('--script', default=False, help="Script the model")
+args = parser.parse_args()
+
 random.seed(1337)
 torch.manual_seed(1337)
 torch.backends.cudnn.deterministic = True
@@ -32,13 +39,11 @@ H = 256
 T = 30
 NT = 30
 model = NeuralCFG(len(WORD.vocab), T, NT, H)
+if args.script:
+    print("scripting...")
+    model = torch.jit.script(model)
 model.cuda()
 opt = torch.optim.Adam(model.parameters(), lr=0.001, betas=[0.75, 0.999])
-
-dump_outputs = ""
-if len(sys.argv) > 2:
-    if sys.argv[1] == "--debug":
-        dump_outputs = sys.argv[2]
 
 def train():
     # model.train()
@@ -62,7 +67,8 @@ def train():
             if i % 100 == 1:
                 print(-torch.tensor(losses).mean(), words.shape)
                 losses = []
-    if dump_outputs:
-        torch.save(params[0], dump_outputs)
+    if args.debug:
+        print(f"saving to {args.debug}...")
+        torch.save(params[0], args.debug)
 
 train()
