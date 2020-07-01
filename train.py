@@ -3,6 +3,14 @@ import torch
 from torch_struct import SentCFG
 from torch_struct.networks import NeuralCFG
 import torch_struct.data
+import sys
+
+import random
+
+random.seed(1337)
+torch.manual_seed(1337)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 # Download and the load default data.
 WORD = torchtext.data.Field(include_lengths=True)
@@ -18,7 +26,7 @@ train, val, test = torchtext.datasets.UDPOS.splits(
 
 WORD.build_vocab(train.word, min_freq=3)
 UD_TAG.build_vocab(train.udtag)
-train_iter = torch_struct.data.TokenBucket(train, batch_size=200, device="cuda:0")
+train_iter = torch_struct.data.TokenBucket(train, batch_size=100, device="cuda:0")
 
 H = 256
 T = 30
@@ -27,11 +35,15 @@ model = NeuralCFG(len(WORD.vocab), T, NT, H)
 model.cuda()
 opt = torch.optim.Adam(model.parameters(), lr=0.001, betas=[0.75, 0.999])
 
+dump_outputs = ""
+if len(sys.argv) > 2:
+    if sys.argv[1] == "--debug":
+        dump_outputs = sys.argv[2]
 
 def train():
     # model.train()
     losses = []
-    for epoch in range(10):
+    for epoch in range(2):
         for i, ex in enumerate(train_iter):
             opt.zero_grad()
             words, lengths = ex.word
@@ -45,9 +57,12 @@ def train():
             torch.nn.utils.clip_grad_norm_(model.parameters(), 3.0)
             opt.step()
 
+            if i > 100:
+                break
             if i % 100 == 1:
                 print(-torch.tensor(losses).mean(), words.shape)
                 losses = []
-
+    if dump_outputs:
+        torch.save(params[0], dump_outputs)
 
 train()
