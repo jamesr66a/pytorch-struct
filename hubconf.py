@@ -63,9 +63,6 @@ class Model:
       torch.nn.utils.clip_grad_norm_(self.model.parameters(), 3.0)
       self.opt.step()
 
-  def eval(self, niter=1):
-    pass
-
 if __name__ == '__main__':
   for device in ['cpu', 'cuda']:
     for jit in [True, False]:
@@ -74,4 +71,3 @@ if __name__ == '__main__':
       model, example_inputs = m.get_module()
       model(*example_inputs)
       m.train()
-      m.eval()
