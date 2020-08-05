@@ -1,6 +1,7 @@
 import torchtext
 import torch, random
 import numpy as np
+import pytest
 from torch_struct import SentCFG
 from torch_struct.networks import NeuralCFG
 import torch_struct.data
@@ -62,6 +63,18 @@ class Model:
       losses.append(loss.detach())
       torch.nn.utils.clip_grad_norm_(self.model.parameters(), 3.0)
       self.opt.step()
+
+
+def cuda_sync(func, sync=False):
+    func()
+    if sync:
+      torch.cuda.synchronize()
+
+@pytest.mark.parametrize('jit',  [True, False], ids=['jit', 'no-jit'])
+@pytest.mark.parametrize('device',  ['cpu', 'cuda'])
+def test_train(benchmark, device, jit):
+  m = Model(device=device, jit=jit)
+  benchmark(cuda_sync, m.train, device=='cuda')
 
 if __name__ == '__main__':
   for device in ['cpu', 'cuda']:
