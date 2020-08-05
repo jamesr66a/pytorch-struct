@@ -41,6 +41,11 @@ class Model:
         self.model = torch.jit.script(self.model)
     self.model.to(device=device)
     self.opt = torch.optim.Adam(self.model.parameters(), lr=0.001, betas=[0.75, 0.999])
+    for i, ex in enumerate(self.train_iter):
+      words, lengths = ex.word
+      self.words = words.long().to(device).transpose(0, 1)
+      self.lengths = lengths.to(device)
+      break
 
   def get_module(self):
     for ex in self.train_iter:
@@ -50,20 +55,17 @@ class Model:
 
   def train(self, niter=1):
     losses = []
-    for i, ex in enumerate(self.train_iter):
-      if i == niter:
-        break
-      self.opt.zero_grad()
-      words, lengths = ex.word
-      words = words.long()
-      params = self.model(words.to(device=self.device).transpose(0, 1))
-      dist = SentCFG(params, lengths=lengths)
-      loss = dist.partition.mean()
-      (-loss).backward()
-      losses.append(loss.detach())
-      torch.nn.utils.clip_grad_norm_(self.model.parameters(), 3.0)
-      self.opt.step()
+    self.opt.zero_grad()
+    params = self.model(self.words)
+    dist = SentCFG(params, lengths=self.lengths)
+    loss = dist.partition.mean()
+    (-loss).backward()
+    losses.append(loss.detach())
+    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 3.0)
+    self.opt.step()
 
+  def eval(self, niter=1):
+    params = self.model(self.words)
 
 def cuda_sync(func, sync=False):
     func()
