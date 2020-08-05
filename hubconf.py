@@ -78,6 +78,12 @@ def test_train(benchmark, device, jit):
   m = Model(device=device, jit=jit)
   benchmark(cuda_sync, m.train, device=='cuda')
 
+@pytest.mark.parametrize('jit',  [True, False], ids=['jit', 'no-jit'])
+@pytest.mark.parametrize('device',  ['cpu', 'cuda'])
+def test_eval(benchmark, device, jit):
+  m = Model(device=device, jit=jit)
+  benchmark(cuda_sync, m.eval, device=='cuda')
+
 if __name__ == '__main__':
   for device in ['cpu', 'cuda']:
     for jit in [True, False]:
@@ -86,3 +92,4 @@ if __name__ == '__main__':
       model, example_inputs = m.get_module()
       model(*example_inputs)
       m.train()
+      m.eval()
