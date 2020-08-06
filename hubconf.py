@@ -1,6 +1,7 @@
 import torchtext
 import torch, random
 import numpy as np
+import pytest
 from torch_struct import SentCFG
 from torch_struct.networks import NeuralCFG
 import torch_struct.data
@@ -40,6 +41,11 @@ class Model:
         self.model = torch.jit.script(self.model)
     self.model.to(device=device)
     self.opt = torch.optim.Adam(self.model.parameters(), lr=0.001, betas=[0.75, 0.999])
+    for i, ex in enumerate(self.train_iter):
+      words, lengths = ex.word
+      self.words = words.long().to(device).transpose(0, 1)
+      self.lengths = lengths.to(device)
+      break
 
   def get_module(self):
     for ex in self.train_iter:
@@ -48,15 +54,11 @@ class Model:
       return self.model, (words.to(device=self.device).transpose(0, 1),)
 
   def train(self, niter=1):
-    losses = []
-    for i, ex in enumerate(self.train_iter):
-      if i == niter:
-        break
+    for _ in range(niter):
+      losses = []
       self.opt.zero_grad()
-      words, lengths = ex.word
-      words = words.long()
-      params = self.model(words.to(device=self.device).transpose(0, 1))
-      dist = SentCFG(params, lengths=lengths)
+      params = self.model(self.words)
+      dist = SentCFG(params, lengths=self.lengths)
       loss = dist.partition.mean()
       (-loss).backward()
       losses.append(loss.detach())
@@ -64,7 +66,24 @@ class Model:
       self.opt.step()
 
   def eval(self, niter=1):
-    pass
+    for _ in range(niter):
+      params = self.model(self.words)
+
+def cuda_sync(func, sync=False):
+    func()
+    if sync:
+      torch.cuda.synchronize()
+
+@pytest.mark.parametrize('jit',  [True, False], ids=['jit', 'no-jit'])
+@pytest.mark.parametrize('device',  ['cpu', 'cuda'])
+class TestBench():
+  def test_train(self, benchmark, device, jit):
+    m = Model(device=device, jit=jit)
+    benchmark(cuda_sync, m.train, device=='cuda')
+
+  def test_eval(self, benchmark, device, jit):
+    m = Model(device=device, jit=jit)
+    benchmark(cuda_sync, m.eval, device=='cuda')
 
 if __name__ == '__main__':
   for device in ['cpu', 'cuda']:
