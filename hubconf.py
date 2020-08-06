@@ -54,18 +54,20 @@ class Model:
       return self.model, (words.to(device=self.device).transpose(0, 1),)
 
   def train(self, niter=1):
-    losses = []
-    self.opt.zero_grad()
-    params = self.model(self.words)
-    dist = SentCFG(params, lengths=self.lengths)
-    loss = dist.partition.mean()
-    (-loss).backward()
-    losses.append(loss.detach())
-    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 3.0)
-    self.opt.step()
+    for _ in range(niter):
+      losses = []
+      self.opt.zero_grad()
+      params = self.model(self.words)
+      dist = SentCFG(params, lengths=self.lengths)
+      loss = dist.partition.mean()
+      (-loss).backward()
+      losses.append(loss.detach())
+      torch.nn.utils.clip_grad_norm_(self.model.parameters(), 3.0)
+      self.opt.step()
 
   def eval(self, niter=1):
-    params = self.model(self.words)
+    for _ in range(niter):
+      params = self.model(self.words)
 
 def cuda_sync(func, sync=False):
     func()
